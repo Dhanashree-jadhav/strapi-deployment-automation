@@ -1,7 +1,7 @@
 name: Terraform Deployment
 
 on:
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -9,8 +9,11 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TF_VAR_ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
-      TF_VAR_image_tag: latest
+      TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      TF_VAR_region: "us-east-2"
+      TF_VAR_key_name: "strapi-key-dhanashree"
+      TF_VAR_docker_image: ${{ secrets.DOCKER_IMAGE }}
 
     steps:
       - name: Checkout repo
@@ -38,7 +41,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            sudo docker pull dhanuj1611/strapi:latest
+            sudo docker pull ${{ secrets.DOCKER_IMAGE }}
             sudo docker stop strapi || true
             sudo docker rm strapi || true
-            sudo docker run -d --name strapi -p 80:1337 dhanuj1611/strapi:latest
+            sudo docker run -d --name strapi -p 80:1337 ${{ secrets.DOCKER_IMAGE }}

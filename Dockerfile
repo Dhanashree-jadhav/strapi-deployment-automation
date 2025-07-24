@@ -1,11 +1,23 @@
-# Use a lightweight Node image
+# Use Node.js base image
 FROM node:18-alpine
 
-# Create and set working directory
+# Set working directory
 WORKDIR /app
 
-# Copy everything from your repo (even if empty)
+# Copy dependency definitions
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the application
 COPY . .
 
-# Run a simple command to verify the image builds
-CMD ["node", "-e", "console.log('✅ Docker image built successfully!')"]
+# Build Strapi app
+RUN npm run build
+
+# Expose port Strapi runs on
+EXPOSE 1337
+
+# Start Strapi
+CMD ["npm", "start"]
