@@ -1,0 +1,44 @@
+name: Terraform Deployment
+
+on:
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  deploy:
+    name: Deploy to EC2 with Terraform
+    runs-on: ubuntu-latest
+
+    env:
+      TF_VAR_ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
+      TF_VAR_image_tag: latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./terraform
+
+      - name: Terraform Plan
+        run: terraform plan
+        working-directory: ./terraform
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        working-directory: ./terraform
+
+      - name: SSH into EC2 and deploy Docker container
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            sudo docker pull dhanuj1611/strapi:latest
+            sudo docker stop strapi || true
+            sudo docker rm strapi || true
+            sudo docker run -d --name strapi -p 80:1337 dhanuj1611/strapi:latest
