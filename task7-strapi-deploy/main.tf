@@ -140,5 +140,9 @@ resource "aws_ecs_service" "strapi_dh_service" {
     container_port   = 1337
   }
 
-  depends_on = [aws_lb_listener.strapi_dh_listener]
+  depends_on = [
+    aws_lb_listener.strapi_dh_listener,
+    aws_lb_target_group.strapi_dh_tg,
+    aws_lb.strapi_dh_alb
+  ]
 }
