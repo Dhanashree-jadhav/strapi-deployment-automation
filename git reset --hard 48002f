@@ -1,0 +1,19 @@
+[33m1f71e1d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m trigger redeploy
+[33m84a7091[m feat: setup GitHub Actions for ECS + ECR deploy
+[33me9f51ae[m Fix: Updated Terraform resources for clean ECS/ALB deployment
+[33m0201000[m fix: update output to reference new ALB resource name
+[33m086e27c[m feat: update Terraform resource names for new ALB and TG
+[33mba5d86b[m Fix: Cleaned deploy.yml and removed redundant image variable step
+[33m9ef3f41[m Fix: ECS deploy setup for Strapi
+[33m3e92e27[m Update deploy.yml for ECS deployment with Terraform
+[33mb91201a[m Trigger CI
+[33m486002f[m Ensure Terraform files are tracked
+[33m5227988[m Fix: Move deploy.yml to correct GitHub Actions path
+[33md9f4572[m Set up ECS Fargate deployment with GitHub Actions
+[33mcfffc5e[m Task 7 - Deploy Strapi using ECS Fargate via GitHub Actions
+[33madd12a2[m Task 5: Add Terraform workflow, Dockerfile, and infrastructure setup
+[33m4053ae8[m Add Terraform config for EC2 deployment (secrets excluded)
+[33mc19ad4f[m Fix: Point Terraform to ./terraform directory
+[33mf405345[m Fix: Run Terraform from root directory
+[33mff99d04[m Add Terraform GitHub Actions workflow
+[33m52600dc[m Add test Dockerfile and CI workflow

@@ -1,48 +1,47 @@
-name: Deploy Strapi to ECS
+name: Deploy to ECS
 
 on:
   push:
-    branches: [main]
-
-env:
-  AWS_REGION: us-east-2
-  ECR_REPO: 607700977843.dkr.ecr.us-east-2.amazonaws.com/strapi-app-ecr-dhan
-  TF_DIR: task7-strapi-deploy
+    branches: ["main"]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: arn:aws:iam::607700977843:role/github-actions-role
-          aws-region: ${{ env.AWS_REGION }}
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-2
 
-      - name: Login to Amazon ECR
-        run: |
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and push Docker image
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker build -t $ECR_REPO:$IMAGE_TAG .
-          docker push $ECR_REPO:$IMAGE_TAG
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+    - name: Build, tag, and push image to ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: latest
+      run: |
+        docker build -t $ECR_REGISTRY/strapi-task7:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/strapi-task7:$IMAGE_TAG
 
-      - name: Update Terraform image variable
-        working-directory: ${{ env.TF_DIR }}
-        run: |
-          sed -i "s|default *= *\".*\"|default = \"${{ env.IMAGE_TAG }}\"|" variables.tf
+    - name: Fill in new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-7-ecs-fargate-terraform/task-definition.json
+        container-name: strapi-task7
+        image: ${{ steps.login-ecr.outputs.registry }}/strapi-task7:latest
 
-      - name: Terraform Init
-        working-directory: ${{ env.TF_DIR }}
-        run: terraform init
-
-      - name: Terraform Apply
-        working-directory: ${{ env.TF_DIR }}
-        run: terraform apply -auto-approve
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        service: strapi-task7-service
+        cluster: strapi-task7-cluster
+        task-definition: ${{ steps.task-def.outputs.task-definition-arn }}

@@ -50,7 +50,7 @@ resource "aws_security_group" "strapi_sg" {
   }
 }
 
-# ECS Cluster
+# ECS Cluster (safe to delete)
 resource "aws_ecs_cluster" "strapi_cluster" {
   name = "strapi-ecs-cluster-dhan"
 }
@@ -94,50 +94,10 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# ECS Task Definition
-resource "aws_ecs_task_definition" "strapi_task" {
-  family                   = "strapi-task-dhan"
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = "512"
-  memory                   = "1024"
-  execution_role_arn       = "arn:aws:iam::607700977843:role/ecs-task-execution-role"
-  task_role_arn            = "arn:aws:iam::607700977843:role/ecs-task-execution-role"
+resource "aws_ecr_repository" "strapi" {
+  name = "strapi-app-ecr-dhan"
 
-  container_definitions = jsonencode([
-    {
-      name      = "strapi"
-      image     = "607700977843.dkr.ecr.us-east-2.amazonaws.com/strapi-app-ecr-dhan:latest"
-      essential = true
-      portMappings = [
-        {
-          containerPort = 1337
-          protocol      = "tcp"
-        }
-      ]
-    }
-  ])
-}
-
-# ECS Fargate Service
-resource "aws_ecs_service" "strapi_service" {
-  name            = "strapi-service-dhan"
-  cluster         = aws_ecs_cluster.strapi_cluster.id
-  task_definition = aws_ecs_task_definition.strapi_task.arn
-  launch_type     = "FARGATE"
-  desired_count   = 1
-
-  network_configuration {
-    subnets         = local.unique_subnets
-    security_groups = [aws_security_group.strapi_sg.id]
-    assign_public_ip = true
+  lifecycle {
+    prevent_destroy = true
   }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.strapi_tg.arn
-    container_name   = "strapi"
-    container_port   = 1337
-  }
-
-  depends_on = [aws_lb_listener.http]
 }
