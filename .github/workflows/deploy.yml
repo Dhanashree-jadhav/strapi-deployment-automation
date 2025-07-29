@@ -23,11 +23,6 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Create ECR repository if not exists
-      run: |
-        aws ecr describe-repositories --repository-names strapi-task7 || \
-        aws ecr create-repository --repository-name strapi-task7
-
     - name: Build, tag, and push image to ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -36,17 +31,17 @@ jobs:
         docker build -t $ECR_REGISTRY/strapi-task7:$IMAGE_TAG .
         docker push $ECR_REGISTRY/strapi-task7:$IMAGE_TAG
 
-    - name: Fill in new image ID in the Amazon ECS task definition
-      id: task-def
+    - name: Render ECS task definition
+      id: render-task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: task-7-ecs-fargate-terraform/task-definition.json
         container-name: strapi
         image: ${{ steps.login-ecr.outputs.registry }}/strapi-task7:latest
 
-    - name: Deploy Amazon ECS task definition
+    - name: Deploy ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
         service: strapi-task7-service
         cluster: strapi-task7-cluster
-        task-definition: ${{ steps.task-def.outputs.task-definition-arn }}
+        task-definition: ${{ steps.render-task-def.outputs.task-definition-arn }}
