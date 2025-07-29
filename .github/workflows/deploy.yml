@@ -44,4 +44,4 @@ jobs:
       with:
         service: strapi-task7-service
         cluster: strapi-task7-cluster
-        task-definition: ${{ steps.render-task-def.outputs.task-definition-arn }}
+        task-definition: ${{ steps.render-task-def.outputs.task-definition }}
