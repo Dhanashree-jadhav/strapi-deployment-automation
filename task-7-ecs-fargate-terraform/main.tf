@@ -76,7 +76,7 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# Task Definition
+# 2. Update ECS Task Definition with awslogs config
 resource "aws_ecs_task_definition" "strapi" {
   family                   = "strapi-task7"
   requires_compatibilities = ["FARGATE"]
@@ -93,7 +93,15 @@ resource "aws_ecs_task_definition" "strapi" {
     portMappings = [{
       containerPort = 1337
       protocol      = "tcp"
-    }]
+    }],
+    logConfiguration = {
+      logDriver = "awslogs",
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.ecs_strapi.name,
+        awslogs-region        = "us-east-2",
+        awslogs-stream-prefix = "ecs/strapi"
+      }
+    }
   }])
 }
 
@@ -118,4 +126,33 @@ resource "aws_ecs_service" "strapi" {
   }
 
   depends_on = [aws_lb_listener.http]
+}
+
+
+# 1. Add CloudWatch Log Group
+resource "aws_cloudwatch_log_group" "ecs_strapi" {
+  name              = "/ecs/strapi"
+  retention_in_days = 7
+  skip_destroy      = false
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# 3. Optional: CloudWatch Alarm for CPU Utilization
+resource "aws_cloudwatch_metric_alarm" "high_cpu" {
+  alarm_name          = "strapi-high-cpu"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/ECS"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 75
+  alarm_description   = "This alarm triggers if CPU > 75% for 2 minutes."
+  dimensions = {
+    ClusterName = aws_ecs_cluster.strapi.name
+    ServiceName = aws_ecs_service.strapi.name
+  }
 }
