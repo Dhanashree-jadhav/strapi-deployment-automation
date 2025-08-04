@@ -57,6 +57,7 @@ jobs:
         run: |
           TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+          sed -i "s|TASK_DEF_PLACEHOLDER|$TASK_DEF_ARN|" task-7-ecs-fargate-terraform/appspec.yaml
 
       - name: Trigger CodeDeploy deployment
         run: |
@@ -65,5 +66,4 @@ jobs:
             --deployment-group-name $CODEDEPLOY_DEPLOYMENT_GROUP \
             --revision file://task-7-ecs-fargate-terraform/appspec.yaml \
             --deployment-config-name CodeDeployDefault.ECSCanary10Percent5Minutes \
-            --description "GitHub Actions Deployment" \
-            --targetInstances "ECSServiceName=${ECS_SERVICE},ClusterName=${ECS_CLUSTER},TaskDefinition=$TASK_DEF_ARN"
+            --description "GitHub Actions Deployment"
