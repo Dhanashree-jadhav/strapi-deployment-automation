@@ -1,5 +1,3 @@
-# .github/workflows/task12-deploy.yml
-
 name: Deploy to ECS with CodeDeploy
 
 on:
@@ -20,14 +18,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout source
         uses: actions/checkout@v3
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/<your-github-oidc-role>
 
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
@@ -35,30 +34,30 @@ jobs:
       - name: Build and tag Docker image
         run: |
           COMMIT_SHA=${GITHUB_SHA::7}
-          docker build -t $ECR_REPO:$COMMIT_SHA .
-          docker tag $ECR_REPO:$COMMIT_SHA ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO:$COMMIT_SHA
+          IMAGE_TAG=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO:$COMMIT_SHA
+          docker build -t $IMAGE_TAG .
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
-      - name: Push image to ECR
+      - name: Push Docker image to ECR
         run: |
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO:$COMMIT_SHA
+          docker push $IMAGE_TAG
 
       - name: Replace image tag in task-definition.json
         run: |
-          IMAGE="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO:$COMMIT_SHA"
-          sed "s|IMAGE_PLACEHOLDER|$IMAGE|" task-7-ecs-fargate-terraform/task-definition.json > task-7-ecs-fargate-terraform/new-task-def.json
+          sed "s|IMAGE_PLACEHOLDER|$IMAGE_TAG|" task-7-ecs-fargate-terraform/task-definition.json > new-task-def.json
 
-      - name: Register ECS Task Definition
-        id: register-task
+      - name: Register new ECS Task Definition
+        id: register-task-def
         run: |
-          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-7-ecs-fargate-terraform/new-task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
 
-      - name: Trigger CodeDeploy Deployment
+      - name: Trigger CodeDeploy deployment
         run: |
           aws deploy create-deployment \
             --application-name $CODEDEPLOY_APP \
             --deployment-group-name $CODEDEPLOY_DEPLOYMENT_GROUP \
+            --revision file://task-7-ecs-fargate-terraform/appspec.yaml \
             --deployment-config-name CodeDeployDefault.ECSCanary10Percent5Minutes \
             --description "GitHub Actions Deployment" \
-            --revision "revisionType=AppSpecContent,appSpecContent={content=$(cat task-7-ecs-fargate-terraform/appspec.yaml | base64)}" \
             --targetInstances "ECSServiceName=${ECS_SERVICE},ClusterName=${ECS_CLUSTER},TaskDefinition=$TASK_DEF_ARN"
