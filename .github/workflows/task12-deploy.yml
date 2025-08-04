@@ -1,0 +1,64 @@
+# .github/workflows/task12-deploy.yml
+
+name: Deploy to ECS with CodeDeploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPO: strapi-app-ecr-dhan
+  ECS_CLUSTER: strapi-task11-cluster-dh
+  ECS_SERVICE: strapi-task11-service-dh
+  CODEDEPLOY_APP: strapi-codedeploy-app-dh
+  CODEDEPLOY_DEPLOYMENT_GROUP: strapi-deployment-group-dh
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/<your-github-oidc-role>
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and tag Docker image
+        run: |
+          COMMIT_SHA=${GITHUB_SHA::7}
+          docker build -t $ECR_REPO:$COMMIT_SHA .
+          docker tag $ECR_REPO:$COMMIT_SHA ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO:$COMMIT_SHA
+
+      - name: Push image to ECR
+        run: |
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO:$COMMIT_SHA
+
+      - name: Replace image tag in task-definition.json
+        run: |
+          IMAGE="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO:$COMMIT_SHA"
+          sed "s|IMAGE_PLACEHOLDER|$IMAGE|" task-7-ecs-fargate-terraform/task-definition.json > task-7-ecs-fargate-terraform/new-task-def.json
+
+      - name: Register ECS Task Definition
+        id: register-task
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-7-ecs-fargate-terraform/new-task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+
+      - name: Trigger CodeDeploy Deployment
+        run: |
+          aws deploy create-deployment \
+            --application-name $CODEDEPLOY_APP \
+            --deployment-group-name $CODEDEPLOY_DEPLOYMENT_GROUP \
+            --deployment-config-name CodeDeployDefault.ECSCanary10Percent5Minutes \
+            --description "GitHub Actions Deployment" \
+            --revision "revisionType=AppSpecContent,appSpecContent={content=$(cat task-7-ecs-fargate-terraform/appspec.yaml | base64)}" \
+            --targetInstances "ECSServiceName=${ECS_SERVICE},ClusterName=${ECS_CLUSTER},TaskDefinition=$TASK_DEF_ARN"
