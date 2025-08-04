@@ -1,58 +1,24 @@
 {
-    "taskDefinitionArn": "arn:aws:ecs:us-east-2:607700977843:task-definition/strapi-task7:1",
-    "containerDefinitions": [
+  "family": "strapi-task7",
+  "networkMode": "awsvpc",
+  "executionRoleArn": "arn:aws:iam::607700977843:role/ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::607700977843:role/ecs-task-execution-role",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "strapi",
+      "image": "IMAGE_PLACEHOLDER",
+      "portMappings": [
         {
-            "name": "strapi",
-            "image": "607700977843.dkr.ecr.us-east-2.amazonaws.com/strapi-app-ecr-dhan:latest",
-            "cpu": 0,
-            "portMappings": [
-                {
-                    "containerPort": 1337,
-                    "hostPort": 1337,
-                    "protocol": "tcp"
-                }
-            ],
-            "essential": true,
-            "environment": [],
-            "mountPoints": [],
-            "volumesFrom": [],
-            "systemControls": []
+          "containerPort": 1337,
+          "protocol": "tcp"
         }
-    ],
-    "family": "strapi-task7",
-    "taskRoleArn": "arn:aws:iam::607700977843:role/ecs-task-execution-role",
-    "executionRoleArn": "arn:aws:iam::607700977843:role/ecs-task-execution-role",
-    "networkMode": "awsvpc",
-    "revision": 1,
-    "volumes": [],
-    "status": "ACTIVE",
-    "requiresAttributes": [
-        {
-            "name": "com.amazonaws.ecs.capability.ecr-auth"
-        },
-        {
-            "name": "com.amazonaws.ecs.capability.task-iam-role"
-        },
-        {
-            "name": "ecs.capability.execution-role-ecr-pull"
-        },
-        {
-            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
-        },
-        {
-            "name": "ecs.capability.task-eni"
-        }
-    ],
-    "placementConstraints": [],
-    "compatibilities": [
-        "EC2",
-        "FARGATE"
-    ],
-    "requiresCompatibilities": [
-        "FARGATE"
-    ],
-    "cpu": "512",
-    "memory": "1024",
-    "registeredAt": "2025-07-29T16:19:35.230000+05:30",
-    "registeredBy": "arn:aws:iam::607700977843:user/Dhanashree-Jadhav"
+      ],
+      "essential": true
+    }
+  ]
 }
