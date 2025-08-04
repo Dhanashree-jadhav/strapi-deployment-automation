@@ -28,57 +28,26 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Log in to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Get AWS Account ID
-        id: aws-id
+      - name: Register new task definition
+        id: task-def
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
-
-      - name: Build and tag Docker image
-        run: |
-          COMMIT_SHA=${GITHUB_SHA::7}
-          IMAGE_TAG=${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO }}:$COMMIT_SHA
-          docker build -t $IMAGE_TAG .
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-
-      - name: Push Docker image to ECR
-        run: |
-          docker push $IMAGE_TAG
-
-      - name: Replace image tag in task-definition.json
-        run: |
-          sed "s|IMAGE_PLACEHOLDER|$IMAGE_TAG|" task-7-ecs-fargate-terraform/task-definition.json > new-task-def.json
-
-      - name: Register new ECS Task Definition
-        id: register-task-def
-        run: |
-          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
-          sed -i "s|TASK_DEF_PLACEHOLDER|$TASK_DEF_ARN|" task-7-ecs-fargate-terraform/appspec.yaml
 
-      - name: Generate revision.json for CodeDeploy
+      - name: Update appspec.yaml with task definition ARN
         run: |
-          CONTENT_BASE64=$(base64 task-7-ecs-fargate-terraform/appspec.yaml | tr -d '\n')
-          SHA256=$(openssl dgst -sha256 -binary task-7-ecs-fargate-terraform/appspec.yaml | openssl base64 | tr -d '\n')
+          sed -i "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" task-7-ecs-fargate-terraform/appspec.yaml
 
-          cat > revision.json <<EOF
-{
-  "revisionType": "AppSpecContent",
-  "appSpecContent": {
-    "content": "$CONTENT_BASE64",
-    "sha256": "$SHA256"
-  }
-}
-EOF
+      - name: Create CodeDeploy revision file
+        run: |
+          CONTENT=$(base64 -w 0 task-7-ecs-fargate-terraform/appspec.yaml)
+          echo "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":\"$CONTENT\"}}" > codedeploy-revision.json
 
-      - name: Trigger CodeDeploy deployment
+      - name: Deploy using CodeDeploy
         run: |
           aws deploy create-deployment \
-            --application-name "$CODEDEPLOY_APP" \
-            --deployment-group-name "$CODEDEPLOY_DEPLOYMENT_GROUP" \
-            --deployment-config-name CodeDeployDefault.ECSCanary10Percent5Minutes \
-            --description "GitHub Actions Deployment" \
-            --revision file://revision.json
+            --application-name ${{ env.CODEDEPLOY_APP }} \
+            --deployment-group-name ${{ env.CODEDEPLOY_DEPLOYMENT_GROUP }} \
+            --revision file://codedeploy-revision.json \
+            --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+            --region ${{ env.AWS_REGION }}
