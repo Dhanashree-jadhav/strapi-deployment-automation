@@ -59,11 +59,16 @@ jobs:
           echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
           sed -i "s|TASK_DEF_PLACEHOLDER|$TASK_DEF_ARN|" task-7-ecs-fargate-terraform/appspec.yaml
 
+
       - name: Trigger CodeDeploy deployment
         run: |
+          CONTENT_BASE64=$(base64 task-7-ecs-fargate-terraform/appspec.yaml | tr -d '\n')
+          SHA256=$(openssl dgst -sha256 -binary task-7-ecs-fargate-terraform/appspec.yaml | openssl base64)
+
           aws deploy create-deployment \
             --application-name $CODEDEPLOY_APP \
             --deployment-group-name $CODEDEPLOY_DEPLOYMENT_GROUP \
-            --revision file://task-7-ecs-fargate-terraform/appspec.yaml \
+            --revision "revisionType=AppSpecContent,appSpecContent={\"content\":\"$CONTENT_BASE64\",\"sha256\":\"$SHA256\"}" \
             --deployment-config-name CodeDeployDefault.ECSCanary10Percent5Minutes \
             --description "GitHub Actions Deployment"
+
