@@ -34,8 +34,7 @@ jobs:
       - name: Get AWS Account ID
         id: aws-id
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          echo "ACCOUNT_ID=$ACCOUNT_ID" >> $GITHUB_ENV
+          echo "ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_ENV
 
       - name: Build and tag Docker image
         run: |
@@ -62,11 +61,11 @@ jobs:
       - name: Trigger CodeDeploy deployment
         run: |
           CONTENT_BASE64=$(base64 task-7-ecs-fargate-terraform/appspec.yaml | tr -d '\n')
-          SHA256=$(openssl dgst -sha256 -binary task-7-ecs-fargate-terraform/appspec.yaml | openssl base64)
+          SHA256=$(openssl dgst -sha256 -binary task-7-ecs-fargate-terraform/appspec.yaml | openssl base64 | tr -d '\n')
 
           aws deploy create-deployment \
-            --application-name $CODEDEPLOY_APP \
-            --deployment-group-name $CODEDEPLOY_DEPLOYMENT_GROUP \
-            --revision revisionType=AppSpecContent,appSpecContent="{\"content\":\"$CONTENT_BASE64\",\"sha256\":\"$SHA256\"}" \
+            --application-name "$CODEDEPLOY_APP" \
+            --deployment-group-name "$CODEDEPLOY_DEPLOYMENT_GROUP" \
+            --revision "revisionType=AppSpecContent,appSpecContent={\"content\":\"$CONTENT_BASE64\",\"sha256\":\"$SHA256\"}" \
             --deployment-config-name CodeDeployDefault.ECSCanary10Percent5Minutes \
             --description "GitHub Actions Deployment"
