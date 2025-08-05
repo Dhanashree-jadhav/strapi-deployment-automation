@@ -42,13 +42,13 @@ jobs:
 
       - name: Replace task definition in appspec.json
         run: |
-          cp task-7-ecs-fargate-terraform/appspec.json ./appspec.json
-          sed -i "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" appspec.json
+          cp task-7-ecs-fargate-terraform/appspec.json codedeploy-appspec.json
+          sed -i "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" codedeploy-appspec.json
 
       - name: Create deployment archive
         run: |
           mkdir codedeploy
-          cp appspec.json codedeploy/appspec.json
+          cp codedeploy-appspec.json codedeploy/appspec.json
           zip -r codedeploy.zip codedeploy/
 
       - name: Upload to S3
