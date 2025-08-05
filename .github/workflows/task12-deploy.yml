@@ -18,41 +18,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
 
-      - name: Register ECS task definition
-        id: register-task
-        run: |
-          TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://task-7-ecs-fargate-terraform/task-definition.json \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+    - name: Register ECS task definition
+      id: register-task
+      run: |
+        TASK_DEF_ARN=$(aws ecs register-task-definition \
+          --cli-input-json file://task-7-ecs-fargate-terraform/task-definition.json \
+          --query 'taskDefinition.taskDefinitionArn' \
+          --output text)
+        echo "TASK_DEF_ARN=$TASK_DEF_ARN"
+        echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+        echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
-      - name: Prepare AppSpec file
-        run: |
-          cp task-7-ecs-fargate-terraform/appspec.yaml appspec.yaml
-          sed -i "s|TASK_DEFINITION_ARN|$TASK_DEF_ARN|g" appspec.yaml
-          cat appspec.yaml  # For debug
+    - name: Update appspec.json with task definition ARN
+      run: |
+        cp task-7-ecs-fargate-terraform/appspec.json ./appspec.json
+        sed -i "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" appspec.json
 
-      - name: Create CodeDeploy revision
-        run: |
-          CONTENT=$(base64 -w 0 appspec.yaml)
-          echo "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":\"$CONTENT\"}}" > codedeploy-revision.json
+    - name: Show contents of rendered appspec.json
+      run: |
+        echo "------- appspec.json --------"
+        cat appspec.json
+        echo "-----------------------------"
 
-      - name: Deploy to ECS via CodeDeploy
-        run: |
-          aws deploy create-deployment \
-            --application-name ${{ env.CODEDEPLOY_APP }} \
-            --deployment-group-name ${{ env.CODEDEPLOY_DEPLOYMENT_GROUP }} \
-            --revision file://codedeploy-revision.json \
-            --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
-            --region ${{ env.AWS_REGION }}
+    - name: Create CodeDeploy revision file
+      run: |
+        CONTENT=$(base64 -w 0 appspec.json)
+        echo "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":\"$CONTENT\"}}" > codedeploy-revision.json
+
+    - name: Deploy to ECS via CodeDeploy
+      run: |
+        aws deploy create-deployment \
+          --application-name ${{ env.CODEDEPLOY_APP }} \
+          --deployment-group-name ${{ env.CODEDEPLOY_DEPLOYMENT_GROUP }} \
+          --revision file://codedeploy-revision.json \
+          --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+          --region ${{ env.AWS_REGION }}
