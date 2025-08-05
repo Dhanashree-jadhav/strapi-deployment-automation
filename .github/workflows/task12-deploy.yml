@@ -1,4 +1,4 @@
-name: Task 12 – Deploy to ECS with CodeDeploy
+name: Deploy to ECS with CodeDeploy
 
 on:
   push:
@@ -6,78 +6,79 @@ on:
       - main
 
 env:
-  AWS_REGION: ap-south-1
-  ECR_REPOSITORY: strapi-ecr-dh
-  ECS_CLUSTER: strapi-cluster-dh
-  ECS_SERVICE: strapi-service-dh
-  TASK_DEFINITION_FILE: task-def.json
-  TASK_FAMILY: strapi-task-family-dh
-  CONTAINER_NAME: strapi
+  AWS_REGION: us-east-2
+  ECR_REPO: strapi-app-ecr-dhan
+  ECS_CLUSTER: strapi-task11-cluster-dh
+  ECS_SERVICE: strapi-task11-service-dh
   CODEDEPLOY_APP: strapi-codedeploy-app-dh
-  CODEDEPLOY_GROUP: strapi-deployment-group-dh
-  S3_BUCKET: strapi-artifacts-dh
-  APP_SPEC_FILE: appspec-strapi.yaml
+  CODEDEPLOY_DEPLOYMENT_GROUP: strapi-deployment-group-dh
+  S3_BUCKET: codedeploy-artifacts-dhanu
+  BUNDLE_NAME: codedeploy.zip
 
 jobs:
   deploy:
-    name: Deploy to ECS Fargate via CodeDeploy
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Log in to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} \
+          | docker login --username AWS --password-stdin \
+            "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
 
-      - name: Build and Push Docker image to ECR
+      - name: Build Docker image
         run: |
           IMAGE_TAG=${GITHUB_SHA::8}
-          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG"
-          docker build -t $IMAGE_URI .
-          docker push $IMAGE_URI
-        env:
-          GITHUB_SHA: ${{ github.sha }}
+          docker build -t ${{ env.ECR_REPO }}:$IMAGE_TAG .
 
-      - name: Download existing task definition
+      - name: Tag & Push image to ECR
         run: |
-          aws ecs describe-task-definition \
-            --task-definition ${{ env.TASK_FAMILY }} \
-            --query taskDefinition > current-task-def.json
+          IMAGE_TAG=${GITHUB_SHA::8}
+          ECR_URI="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO }}"
+          docker tag ${{ env.ECR_REPO }}:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
+          docker push $ECR_URI:$IMAGE_TAG
+          echo "IMAGE_URI=$ECR_URI:$IMAGE_TAG" >> $GITHUB_ENV
 
-      - name: Prepare new task definition with updated image
+      - name: Update ECS task definition
         id: update-task-def
         run: |
-          IMAGE_TAG=${GITHUB_SHA::8}
-          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG"
-          jq --arg IMAGE "$IMAGE_URI" '.containerDefinitions[0].image = $IMAGE' current-task-def.json > new-task-def.json
-          echo "TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)" >> $GITHUB_ENV
+          sed "s|<IMAGE_URI>|${{ env.IMAGE_URI }}|g" task-7-ecs-fargate-terraform/task-definition.json > task-def-updated.json
 
-      - name: Update appspec file with new task definition
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://task-def-updated.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          
+          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Prepare appspec.json
         run: |
-          cp ${{ env.APP_SPEC_FILE }} appspec-temp.yaml
-          sed -i "s|TASK_DEF_ARN|${{ env.TASK_DEF_ARN }}|g" appspec-temp.yaml
+          sed "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" task-7-ecs-fargate-terraform/appspec.json > appspec.json
 
-      - name: Zip appspec and scripts
+      - name: Create deployment bundle
         run: |
-          zip -r appspec-strapi.zip appspec-temp.yaml scripts/
+          zip ${{ env.BUNDLE_NAME }} appspec.json
 
-      - name: Upload to S3
+      - name: Upload bundle to S3
         run: |
-          aws s3 cp appspec-strapi.zip s3://${{ env.S3_BUCKET }}/appspec-strapi.zip
+          aws s3 cp ${{ env.BUNDLE_NAME }} s3://${{ env.S3_BUCKET }}/${{ env.BUNDLE_NAME }}
 
-      - name: Create CodeDeploy deployment
+      - name: Trigger deployment via CodeDeploy
         run: |
           aws deploy create-deployment \
             --application-name ${{ env.CODEDEPLOY_APP }} \
-            --deployment-group-name ${{ env.CODEDEPLOY_GROUP }} \
-            --s3-location bucket=${{ env.S3_BUCKET }},bundleType=zip,key=appspec-strapi.zip \
-            --file-exists-behavior OVERWRITE
+            --deployment-group-name ${{ env.CODEDEPLOY_DEPLOYMENT_GROUP }} \
+            --s3-location bucket=${{ env.S3_BUCKET }},key=${{ env.BUNDLE_NAME }},bundleType=zip \
+            --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+            --region ${{ env.AWS_REGION }}
