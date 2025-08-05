@@ -39,20 +39,20 @@ jobs:
         echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
         echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
-    - name: Update appspec.json with task definition ARN
+    - name: Update appspec.yaml with task definition ARN
       run: |
-        cp task-7-ecs-fargate-terraform/appspec.json ./appspec.json
-        sed -i "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" appspec.json
+        cp task-7-ecs-fargate-terraform/appspec.yaml ./appspec.yaml
+        sed -i "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" appspec.yaml
 
-    - name: Show contents of rendered appspec.json
+    - name: Show contents of rendered appspec.yaml
       run: |
-        echo "------- appspec.json --------"
-        cat appspec.json
+        echo "------- appspec.yaml --------"
+        cat appspec.yaml
         echo "-----------------------------"
 
     - name: Create CodeDeploy revision file
       run: |
-        CONTENT=$(base64 -w 0 appspec.json)
+        CONTENT=$(base64 -w 0 appspec.yaml)
         echo "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":\"$CONTENT\"}}" > codedeploy-revision.json
 
     - name: Deploy to ECS via CodeDeploy
