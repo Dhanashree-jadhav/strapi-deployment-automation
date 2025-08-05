@@ -42,13 +42,13 @@ jobs:
     - name: Update appspec.yaml with task definition ARN
       run: |
         cp task-7-ecs-fargate-terraform/appspec.yaml ./appspec.yaml
-        sed -i "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" appspec.yaml
+        sed -i "s|TASK_DEFINITION_ARN|$TASK_DEF_ARN|g" appspec.yaml
 
     - name: Show contents of rendered appspec.yaml
       run: |
-        echo "------- appspec.yaml --------"
+        echo "------- Rendered appspec.yaml --------"
         cat appspec.yaml
-        echo "-----------------------------"
+        echo "--------------------------------------"
 
     - name: Create CodeDeploy revision file
       run: |
@@ -62,4 +62,5 @@ jobs:
           --deployment-group-name ${{ env.CODEDEPLOY_DEPLOYMENT_GROUP }} \
           --revision file://codedeploy-revision.json \
           --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
-          --region ${{ env.AWS_REGION }}
+          --region ${{ env.AWS_REGION }} \
+          --debug
