@@ -13,6 +13,7 @@ env:
   CODEDEPLOY_APP: strapi-codedeploy-app-dh
   CODEDEPLOY_DEPLOYMENT_GROUP: strapi-deployment-group-dh
   S3_BUCKET: codedeploy-artifacts-dhanu
+  BUNDLE_NAME: codedeploy.zip
 
 jobs:
   deploy:
@@ -40,26 +41,24 @@ jobs:
           echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
           echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
-      - name: Replace task definition in appspec.json
+      - name: Replace task definition ARN in appspec.json
         run: |
-          cp task-7-ecs-fargate-terraform/appspec.json codedeploy-appspec.json
-          sed -i "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" codedeploy-appspec.json
+          cp task-7-ecs-fargate-terraform/appspec.json ./appspec.json
+          sed -i "s|TASK_DEFINITION_ARN|${{ env.TASK_DEF_ARN }}|g" appspec.json
 
-      - name: Create deployment archive
+      - name: Create deployment package (zip)
         run: |
-          mkdir codedeploy
-          cp codedeploy-appspec.json codedeploy/appspec.json
-          zip -r codedeploy.zip codedeploy/
+          zip ${{ env.BUNDLE_NAME }} appspec.json
 
-      - name: Upload to S3
+      - name: Upload bundle to S3
         run: |
-          aws s3 cp codedeploy.zip s3://${{ env.S3_BUCKET }}/codedeploy.zip
+          aws s3 cp ${{ env.BUNDLE_NAME }} s3://${{ env.S3_BUCKET }}/${{ env.BUNDLE_NAME }}
 
-      - name: Deploy to ECS via CodeDeploy
+      - name: Deploy using CodeDeploy
         run: |
           aws deploy create-deployment \
             --application-name ${{ env.CODEDEPLOY_APP }} \
             --deployment-group-name ${{ env.CODEDEPLOY_DEPLOYMENT_GROUP }} \
-            --s3-location bucket=${{ env.S3_BUCKET }},key=codedeploy.zip,bundleType=zip \
+            --s3-location bucket=${{ env.S3_BUCKET }},key=${{ env.BUNDLE_NAME }},bundleType=zip \
             --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
             --region ${{ env.AWS_REGION }}
