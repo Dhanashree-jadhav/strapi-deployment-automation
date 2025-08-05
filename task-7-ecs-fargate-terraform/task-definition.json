@@ -11,7 +11,7 @@
   "containerDefinitions": [
     {
       "name": "strapi",
-      "image": "IMAGE_PLACEHOLDER",
+      "image": "607700977843.dkr.ecr.us-east-2.amazonaws.com/strapi-app-ecr-dhan:latest",
       "portMappings": [
         {
           "containerPort": 1337,
