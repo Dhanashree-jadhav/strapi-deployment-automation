@@ -52,7 +52,7 @@ jobs:
 
     - name: Create CodeDeploy revision file
       run: |
-        CONTENT=$(base64 -w 0 appspec.yaml)
+        CONTENT=$(cat appspec.yaml | base64 | tr -d '\n')
         echo "{\"revisionType\":\"AppSpecContent\",\"appSpecContent\":{\"content\":\"$CONTENT\"}}" > codedeploy-revision.json
 
     - name: Deploy to ECS via CodeDeploy
