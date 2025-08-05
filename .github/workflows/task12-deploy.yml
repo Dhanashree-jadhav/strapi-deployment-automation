@@ -36,12 +36,19 @@ jobs:
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
           echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+          echo "$TASK_DEF_ARN" > task_def_arn.txt
 
       - name: Prepare AppSpec file
         run: |
           cp task-7-ecs-fargate-terraform/appspec.yaml appspec.yaml
+          TASK_DEF_ARN=$(cat task_def_arn.txt)
           sed -i "s|TASK_DEFINITION_ARN|$TASK_DEF_ARN|g" appspec.yaml
-          cat appspec.yaml  # For debug
+
+      - name: Debug: Show appspec.yaml contents
+        run: |
+          echo "-------- appspec.yaml --------"
+          cat appspec.yaml
+          echo "------------------------------"
 
       - name: Create CodeDeploy revision
         run: |
